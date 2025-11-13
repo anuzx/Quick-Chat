@@ -1,77 +1,86 @@
-import { useEffect, useState, useRef } from "react";
+import { useState, useRef } from "react";
+import JoinRoom from "./components/JoinRoom";
+import ChatRoom from "./components/ChatRoom";
 
 function App() {
-  const [messages, setMessages] = useState(["hiii" , "heloo"]); // Should be array, not string
-  
-  const wsRef = useRef(null); // Store WebSocket instance
+  const [currentScreen, setCurrentScreen] = useState("join");
+  const [roomId, setRoomId] = useState("");
+  const [username, setUsername] = useState("");
+  const [messages, setMessages] = useState([]);
 
-  
+  const wsRef = useRef(null);
 
-  useEffect(() => {
+  // Handle joining a room
+  const handleJoinRoom = (room: string, user: string) => {
     const ws = new WebSocket("ws://localhost:8080");
     wsRef.current = ws;
 
     ws.onopen = () => {
       console.log("WebSocket connected");
-      ws.send(JSON.stringify({
-        type: "join",
-        payload: {
-          roomId: "red"
-        }
-      }))
+      ws.send(
+        JSON.stringify({
+          type: "join",
+          payload: {
+            roomId: room,
+            username: user,
+          },
+        })
+      );
+      setRoomId(room);
+      setUsername(user);
+      setCurrentScreen("chat");
     };
 
     ws.onmessage = (ev) => {
-      setMessages((m) => [...m, ev.data]);
+      setMessages((m) => [...m, JSON.parse(ev.data)]);
     };
 
     ws.onerror = (error) => {
       console.error("WebSocket error:", error);
+      alert("Connection failed. Make sure the server is running on port 8080");
     };
 
     ws.onclose = () => {
       console.log("WebSocket disconnected");
+      setCurrentScreen("join");
+      setMessages([]);
     };
+  };
 
-    // Cleanup on unmount
-    return () => {
-      ws.close();
-    };
-  }, []);
+  // Handle sending a message
+  const handleSendMessage = (message: string) => {
+    wsRef.current?.send(
+      JSON.stringify({
+        type: "chat",
+        payload: {
+          message: message,
+        },
+      })
+    );
+  };
+
+  // Handle leaving a room
+  const handleLeaveRoom = () => {
+    wsRef.current?.close();
+    setCurrentScreen("join");
+    setMessages([]);
+    setRoomId("");
+    setUsername("");
+  };
+
+  // Render the appropriate screen
+  if (currentScreen === "join") {
+    return <JoinRoom onJoinRoom={handleJoinRoom} />;
+  }
 
   return (
-    <div className="h-screen bg-black">
-      <div className="h-[85vh] overflow-y-auto p-4">
-        {messages.map((message, index) => (
-          <div key={index} className="mb-2">
-            <span className="bg-white text-black rounded p-4 inline-block">
-              {message}
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="w-full bg-white flex">
-        <input
-          className="flex-1 p-4 outline-none"
-          id="message"
-          placeholder="Type a message..."
-        />
-        <button
-          className="bg-purple-600 text-white p-4 hover:bg-purple-700"
-          onClick={() => {
-            const message = document.getElementById("message")?.value;
-            wsRef.current.send(JSON.stringify({
-              type: "chat",
-              payload: {
-                message: message
-              }
-          }))
-          }}
-        >
-          Send
-        </button>
-      </div>
-    </div>
+    <ChatRoom
+      roomId={roomId}
+      username={username}
+      messages={messages}
+      onSendMessage={handleSendMessage}
+      onLeaveRoom={handleLeaveRoom}
+    />
   );
 }
 

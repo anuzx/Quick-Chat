@@ -32,7 +32,7 @@
 {
     "type":"chat",
     "payload": {
-        "message": "hi",
+        "message": "hi"
     }
 }
 ```

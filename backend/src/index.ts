@@ -1,31 +1,43 @@
 import { WebSocketServer, WebSocket } from "ws";
 
-const ws = new WebSocketServer({ port: 8080 })
+const ws = new WebSocketServer({ port: 8080 });
 
 interface User {
-    socket: WebSocket; //here socket is like a user
-    room: string;
+  socket: WebSocket; //here socket is like a user
+  room: string;
 }
 
 let allSockets: User[] = [];
 
 ws.on("connection", (socket) => {
-   
+  console.log("New client connected");
 
-socket.on("message", (message) => {
+  socket.on("message", (message) => {
     //in websockets you cannot communicate through json-objects , u can only communicate binary or string
-    
-    const parseMessage = JSON.parse(message as unknown as string) //convert string into object
+
+    const parseMessage = JSON.parse(message as unknown as string); //convert string into object
     if (parseMessage.type === "join") {
-        allSockets.push({
-            socket,
-            room:parseMessage.payload.roomId
-        })
+      //add user to a room
+      allSockets.push({
+        socket,
+        room: parseMessage.payload.roomId,
+      });
     }
 
-    if (parseMessage.type === "chat") {
-        const currentUserRoom = allSockets.find((x)=>x.socket == socket) //it will iterate over the array and return the 1st element for which the call back fxn returns true value
-    }
-});
+      if (parseMessage.type === "chat") {
+        // Find the current user's room
+        const currentUser = allSockets.find((user) => user.socket === socket);
+        //it will iterate over the array and return the 1st element for which the call back fxn returns true value
+
+        if (currentUser) {
+          // Broadcast message to all users in the same room
+          for (let i = 0; i < allSockets.length; i++) {
+            if (allSockets[i]?.room === currentUser.room) {
+              allSockets[i]?.socket.send(parseMessage.payload.message);
+            }
+          }
+        }
+      }
     
-})
+  });
+});
